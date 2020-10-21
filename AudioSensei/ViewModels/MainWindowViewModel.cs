@@ -123,7 +123,7 @@ namespace AudioSensei.ViewModels
 
         // Playlists
         private Playlist currentlyVisiblePlaylist = new Playlist("", Guid.NewGuid(), "", "", new ObservableCollection<Track>());
-        private Playlist? currentlyPlayedPlaylist;
+        private Playlist? currentlyPlayedPlaylist = null;
 
         // Tracks
         private int selectedTrackIndex = -1;
@@ -500,22 +500,24 @@ namespace AudioSensei.ViewModels
             {
                 var playlist = Playlist.Load(file);
 
-                for (int i = 0; i < playlist.Tracks.Count; i++)
+                foreach (var track in playlist.Tracks)
                 {
-                    var track = playlist.Tracks[i];
-
-                    switch (track.Source)
+                    Task.Run(async () => 
                     {
-                        case Source.File:
-                            track.LoadMetadataFromFile();
-                            break;
-                        case Source.YouTube:
-                            break;
-                        default:
-                            throw new NotImplementedException();
-                    }
-
-                    playlist.Tracks[i] = track;
+                        switch (track.Source)
+                        {
+                            case Source.File:
+                                track.LoadMetadataFromFile();
+                                break;
+                            case Source.YouTube:
+                                var info = await YoutubePlayer.GetInfo(track.Url);
+                                track.Name = info.Video.Title;
+                                track.Author = info.Video.Author;
+                                break;
+                            default:
+                                throw new NotImplementedException();
+                        }
+                    });
                 }
 
                 Playlists.Add(playlist);
@@ -531,7 +533,7 @@ namespace AudioSensei.ViewModels
         {
             currentlyPlayedPlaylist ??= currentlyVisiblePlaylist;
 
-            if (currentlyPlayedPlaylist?.Tracks!.Count == 0)
+            if (currentlyPlayedPlaylist?.Tracks?.Count == 0)
             {
                 return;
             }
@@ -597,13 +599,13 @@ namespace AudioSensei.ViewModels
                     CurrentTrackIndex = SelectedTrackIndex;
                 }
             }
-
+            
             var track = currentlyPlayedPlaylist?.Tracks?[CurrentTrackIndex];
 
             if (track == null)
                 throw new ArgumentNullException(nameof(track));
 
-            await Play(track.Value);
+            await Play(track);
         }
 
         private void Stop()
@@ -629,7 +631,7 @@ namespace AudioSensei.ViewModels
 
             if (shuffle)
             {
-                CurrentTrackIndex = random.Next(0, currentlyPlayedPlaylist?.Tracks?.Count - 1 ?? 0);
+                CurrentTrackIndex = random.Next(0, currentlyPlayedPlaylist != null ? currentlyPlayedPlaylist?.Tracks!.Count - 1 : 0);
             }
             else if (CurrentTrackIndex > 0)
             {
@@ -637,7 +639,7 @@ namespace AudioSensei.ViewModels
             }
             else if (repeat)
             {
-                CurrentTrackIndex = currentlyPlayedPlaylist?.Tracks?.Count - 1 ?? 0;
+                CurrentTrackIndex = currentlyPlayedPlaylist != null ? currentlyPlayedPlaylist?.Tracks!.Count - 1 : 0;
             }
             else
             {
@@ -654,7 +656,7 @@ namespace AudioSensei.ViewModels
             if (track == null)
                 throw new ArgumentNullException(nameof(track));
 
-            await Play(track.Value);
+            await Play(track);
         }
 
         private async Task Next(bool repeat = true, bool shuffle = false)
@@ -666,9 +668,9 @@ namespace AudioSensei.ViewModels
 
             if (shuffle)
             {
-                CurrentTrackIndex = random.Next(0, (currentlyPlayedPlaylist?.Tracks?.Count ?? 0) - 1);
+                CurrentTrackIndex = random.Next(0, currentlyPlayedPlaylist != null ? currentlyPlayedPlaylist?.Tracks!.Count - 1 : 0);
             }
-            else if (CurrentTrackIndex < (currentlyPlayedPlaylist?.Tracks?.Count ?? 0) - 1)
+            else if (CurrentTrackIndex < (currentlyPlayedPlaylist != null ? currentlyPlayedPlaylist?.Tracks!.Count - 1 : 0))
             {
                 CurrentTrackIndex++;
             }
@@ -691,7 +693,7 @@ namespace AudioSensei.ViewModels
             if (track == null)
                 throw new ArgumentNullException(nameof(track));
 
-            await Play(track.Value);
+            await Play(track);
         }
 
         private void Shuffle()

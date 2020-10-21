@@ -1,11 +1,14 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.IO;
+using System.Runtime.CompilerServices;
+using Avalonia.Threading;
+using JetBrains.Annotations;
+using Newtonsoft.Json;
 
 namespace AudioSensei.Models
 {
-    public struct Track : IEquatable<Track>, INotifyPropertyChanged
+    public sealed class Track : IEquatable<Track>, INotifyPropertyChanged
     {
         [JsonIgnore]
         public string Name
@@ -14,7 +17,7 @@ namespace AudioSensei.Models
             set
             {
                 _name = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Name"));
+                OnPropertyChanged(nameof(Name));
             }
         }
         [JsonIgnore]
@@ -24,7 +27,7 @@ namespace AudioSensei.Models
             set
             {
                 _author = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Author"));
+                OnPropertyChanged(nameof(Author));
             }
         }
         public Source Source { get; }
@@ -74,30 +77,45 @@ namespace AudioSensei.Models
                 Author = "Unknown";
             }
         }
-
+        
         public bool Equals(Track other)
         {
-            return Name == other.Name && Author == other.Author && Source == other.Source && Url == other.Url;
+            if (ReferenceEquals(null, other)) return false;
+            if (ReferenceEquals(this, other)) return true;
+            return _name == other._name && _author == other._author && Source == other.Source && Url == other.Url;
         }
 
         public override bool Equals(object obj)
         {
-            return obj is Track other && Equals(other);
+            return ReferenceEquals(this, obj) || obj is Track other && Equals(other);
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Name, Author, (int)Source, Url);
+            return HashCode.Combine(_name, _author, (int) Source, Url);
         }
 
         public static bool operator ==(Track left, Track right)
         {
-            return left.Equals(right);
+            return Equals(left, right);
         }
 
         public static bool operator !=(Track left, Track right)
         {
-            return !left.Equals(right);
+            return !Equals(left, right);
+        }
+
+        [NotifyPropertyChangedInvocator]
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
+            }
         }
     }
 }
